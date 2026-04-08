@@ -885,6 +885,22 @@
     .player-podium { width: 100%; max-width: 280px; }
     .dire-row { flex-direction: column; align-items: stretch; }
   }
+
+  .mode-pick { display: flex; flex-direction: column; gap: 14px; width: 100%; max-width: 600px; }
+  .mode-pick .search-btn.mode-duo {
+    font-size: 1.35rem; letter-spacing: 3px;
+    background: linear-gradient(180deg, #1a1520 0%, #120a18 50%, #1a1520 100%);
+    border-color: #8866aa;
+  }
+  .mode-pick .search-btn.mode-duo:hover { border-color: #aa88cc; box-shadow: 0 0 28px rgba(160,120,200,0.35); }
+  .results-duo-wrap { max-width: 640px; margin: 0 auto; }
+  .results-duo-title { font-family: 'Russo One', sans-serif; font-size: 1.6rem; color: var(--red-bright); text-align: center; margin-bottom: 8px; letter-spacing: 3px; }
+  .results-duo-sub { text-align: center; color: #888; font-size: 0.95rem; margin-bottom: 22px; }
+  .results-duo-table { width: 100%; border-collapse: collapse; font-family: 'Rajdhani', sans-serif; font-size: 1.1rem; }
+  .results-duo-table th, .results-duo-table td { border: 1px solid #444; padding: 12px 14px; text-align: center; }
+  .results-duo-table th { background: rgba(196,30,30,0.25); color: var(--silver-light); font-weight: 700; letter-spacing: 2px; text-transform: uppercase; font-size: 0.75rem; }
+  .results-duo-table td:first-child { text-align: left; font-weight: 600; color: var(--silver-light); }
+  .results-duo-winner { text-align: center; margin-top: 22px; font-size: 1.2rem; color: var(--gold); font-weight: 600; letter-spacing: 1px; }
 </style>
 </head>
 <body>
@@ -899,7 +915,7 @@
 <!-- ══════ SCREEN: ACCUEIL ══════ -->
 <div class="screen active" id="screenAccueil">
 <div class="game-container">
-  <div class="top-bar"><span class="top-bar-text">Choisissez un mode de jeu</span></div>
+  <div class="top-bar"><span class="top-bar-text" id="accueilTopText">Choisissez un mode de jeu</span></div>
   <div class="word-count">
     <div><span class="plus">+</span> <span class="label">DE</span></div>
     <div class="number">2.500</div>
@@ -919,13 +935,14 @@
     <div class="pseudo-row">
       <input type="text" id="pseudoInput" class="pseudo-input" placeholder="Votre pseudo..." maxlength="16" />
     </div>
-    <div class="main-action">
-      <div class="team-row" style="margin-bottom:15px">
-        <div class="team-info"><div class="team-label">2 équipes</div><div class="team-detail">4 joueurs réels</div></div>
+    <div class="main-action mode-pick">
+      <div class="team-row" style="margin-bottom:8px">
+        <div class="team-info"><div class="team-label">Qualifications</div><div class="team-detail">4 joueurs — 4 séquences</div></div>
         <div></div>
-        <div class="team-info"><div class="team-label">1 équipe</div><div class="team-detail">2 joueurs réels</div></div>
+        <div class="team-info"><div class="team-label">Duel</div><div class="team-detail">2 joueurs — 2 tours</div></div>
       </div>
-      <button class="search-btn" id="btnPlay">RECHERCHE RAPIDE</button>
+      <button type="button" class="search-btn" id="btnPlay">RECHERCHE RAPIDE — 4 JOUEURS</button>
+      <button type="button" class="search-btn mode-duo" id="btnPlayDuo">DEUX JOUEURS</button>
     </div>
     <div class="bottom-buttons">
       <button class="secondary-btn" onclick="showModal('rules')">Règles du jeu</button>
@@ -1099,6 +1116,27 @@
 </div>
 </div>
 
+<!-- ══════ SCREEN: RÉSULTATS 2 JOUEURS ══════ -->
+<div class="screen" id="screenResultsDuo">
+<div class="game-container results-duo-wrap">
+  <div class="top-bar"><span class="top-bar-text">Fin de partie</span></div>
+  <div class="content" style="padding:32px 36px;">
+    <h2 class="results-duo-title">Tableau des scores</h2>
+    <p class="results-duo-sub" id="resultsDuoSubtitle">Chaque tour : 30 secondes pour trouver un maximum de mots</p>
+    <table class="results-duo-table">
+      <thead>
+        <tr><th>Joueur</th><th>1<sup>er</sup> tour (deviner)</th><th>2<sup>e</sup> tour (deviner)</th><th>Total</th></tr>
+      </thead>
+      <tbody id="resultsDuoBody"></tbody>
+    </table>
+    <p class="results-duo-winner" id="resultsDuoWinner"></p>
+    <div style="text-align:center">
+      <button type="button" class="search-btn" id="btnResultsDuoMenu" style="max-width:420px;margin-top:8px;">Retour au menu</button>
+    </div>
+  </div>
+</div>
+</div>
+
 <button class="sound-toggle" id="soundToggle" title="Son on/off">&#128266;</button>
 
 <!-- Modals -->
@@ -1183,6 +1221,11 @@ const LOBBY_PREFIX='motdepasse-';
 const NUM_ROOMS=10;
 const MAX_PLAYERS=4;
 
+let gameMode='qualif';
+function maxPlayersForMode(){
+  return gameMode==='duo'?2:MAX_PLAYERS;
+}
+
 let myPseudo='Joueur';
 let peer=null;
 let conns=[]; // [{conn, id, pseudo, isRoomHost, _listenersAttached}]
@@ -1198,8 +1241,15 @@ function escapeHtml(s){const d=document.createElement('div');d.textContent=s;ret
 
 // ── Lobby UI ──
 function updateLobbyUI(){
+  const need=maxPlayersForMode();
   for(let i=0;i<4;i++){
     const slot=document.getElementById('slot'+i);
+    // Masquer les slots au-delà du besoin
+    if(i>=need){
+      slot.style.display='none';
+      continue;
+    }
+    slot.style.display='';
     const pl=lobbyPlayers[i];
     if(pl){
       const isHostSlot=pl.isHost;
@@ -1216,14 +1266,16 @@ function updateLobbyUI(){
   const count=lobbyPlayers.length;
   const statusEl=document.getElementById('lobbyStatus');
   const spinnerEl=document.getElementById('lobbySpinner');
-  if(count>=MAX_PLAYERS){
-    statusEl.textContent='4 joueurs connectés \u2014 Lancement imminent !';
+  if(count>=need){
+    statusEl.textContent=need+' joueur'+(need>1?'s':'')+' connecté'+(need>1?'s':'')+' \u2014 Lancement imminent !';
     statusEl.style.color='#00ff44';
     spinnerEl.style.display='none';
   }else{
     statusEl.style.color='#aaa';
     spinnerEl.style.display='';
   }
+  // Adapter le titre du lobby
+  document.getElementById('lobbyTopText').textContent=gameMode==='duo'?'Duel \u2014 En attente d\u2019un adversaire':'Lobby \u2014 En attente de joueurs';
 }
 
 function rebuildLobbyList(){
@@ -1244,15 +1296,19 @@ function rebuildLobbyList(){
 function broadcastRoster(){
   if(!isHost)return;
   const players=[{id:peer.id,pseudo:myPseudo,isHost:true},...conns.map(p=>({id:p.id,pseudo:p.pseudo,isHost:false}))];
-  sendData({type:'roster',players});
-  // 4 players? → countdown
-  if(players.length>=MAX_PLAYERS){
+  sendData({type:'roster',players,mode:gameMode});
+  const need=maxPlayersForMode();
+  if(players.length>=need){
     setTimeout(()=>{
-      if(conns.length>=MAX_PLAYERS-1){
-        // Build canonical teams from host's roster order
-        const tA=[], tB=[];
-        players.forEach((p,i)=>{(i%2===0?tA:tB).push(p.pseudo)});
-        sendData({type:'gameStart',teamA:tA,teamB:tB});
+      if(conns.length>=need-1){
+        let tA=[], tB=[];
+        if(gameMode==='duo'){
+          tA=[players[0].pseudo];
+          tB=[players[1].pseudo];
+        }else{
+          players.forEach((p,i)=>{(i%2===0?tA:tB).push(p.pseudo)});
+        }
+        sendData({type:'gameStart',teamA:tA,teamB:tB,mode:gameMode});
         teamA=tA; teamB=tB;
         onGameStart();
       }
@@ -1269,6 +1325,7 @@ function onData(data,fromConn){
     if(isHost)broadcastRoster();
   }
   else if(data.type==='roster'){
+    if(data.mode) gameMode=data.mode;
     lobbyPlayers=data.players.map(p=>({id:p.id,pseudo:p.pseudo,isHost:p.isHost,isMe:(peer&&p.id===peer.id)}));
     for(const p of data.players){if(peer&&p.id===peer.id)continue;const ex=conns.find(c=>c.id===p.id);if(ex)ex.pseudo=p.pseudo}
     updateLobbyUI();
@@ -1286,10 +1343,11 @@ function onData(data,fromConn){
   else if(data.type==='gameStart'){
     if(data.teamA) teamA=data.teamA;
     if(data.teamB) teamB=data.teamB;
+    if(data.mode) gameMode=data.mode;
     onGameStart();
   }
   else if(data.type==='syncSequences'){
-    // Utiliser directement les séquences de l'hôte — pas de reconstruction locale
+    if(data.mode) gameMode=data.mode;
     mancheState.sequences=data.sequences;
     if(!isHost && clientAwaitingSequenceStart){
       clientAwaitingSequenceStart=false;
@@ -1336,6 +1394,10 @@ function onData(data,fromConn){
       if(seq){
         seq.currentWordIdx=data.newWordIdx;
         console.log('[MDP] syncPass applied: new word="'+seq.words[seq.currentWordIdx]+'" idx='+seq.currentWordIdx);
+        if(data.startChrono && mancheState.wordsPhase && !mancheState.started){
+          startTimer();
+        }
+        mancheState.turn='giver';
         clearDireFields();
         refreshDireInputState();
         updateWordDisplay(seq,{animate:true});
@@ -1358,6 +1420,7 @@ function onData(data,fromConn){
 function startSearch(){
   myPseudo=document.getElementById('pseudoInput').value.trim()||'Joueur';
   document.getElementById('btnPlay').disabled=true;
+  document.getElementById('btnPlayDuo').disabled=true;
   showScreen('screenLobby');
   document.getElementById('lobbyStatus').textContent='Connexion...';
   connected=false;conns=[];lobbyPlayers=[];
@@ -1365,7 +1428,8 @@ function startSearch(){
 }
 
 function tryMatchmaking(){
-  const myId=LOBBY_PREFIX+'p-'+Math.random().toString(36).substr(2,8);
+  const prefix=gameMode==='duo'?LOBBY_PREFIX+'duo-':LOBBY_PREFIX;
+  const myId=prefix+'p-'+Math.random().toString(36).substr(2,8);
   peer=new Peer(myId);
 
   peer.on('error',err=>{
@@ -1378,7 +1442,7 @@ function tryMatchmaking(){
     let joined=false;
 
     for(let i=0;i<NUM_ROOMS;i++){
-      const roomId=LOBBY_PREFIX+'room-'+i;
+      const roomId=prefix+'room-'+i;
       const c=peer.connect(roomId,{reliable:true});
 
       c.on('open',()=>{
@@ -1413,8 +1477,9 @@ function tryMatchmaking(){
 
 function becomeHost(){
   if(connected)return;
+  const prefix=gameMode==='duo'?LOBBY_PREFIX+'duo-':LOBBY_PREFIX;
   const roomIndex=Math.floor(Math.random()*NUM_ROOMS);
-  const roomId=LOBBY_PREFIX+'room-'+roomIndex;
+  const roomId=prefix+'room-'+roomIndex;
 
   peer.destroy();
   peer=new Peer(roomId);
@@ -1427,7 +1492,8 @@ function becomeHost(){
   });
 
   peer.on('connection',c=>{
-    if(conns.length>=MAX_PLAYERS-1){try{c.close()}catch(e){}return}
+    const need=maxPlayersForMode();
+    if(conns.length>=need-1){try{c.close()}catch(e){}return}
 
     const rp={id:c.peer,conn:c,pseudo:'Joueur',isRoomHost:false,_listenersAttached:false};
     conns.push(rp);
@@ -1479,10 +1545,14 @@ function onGameStart(){
   document.body.style.filter='brightness(1.5)';
   setTimeout(()=>{document.body.style.filter='brightness(1)'},300);
 
-  // Build teams from lobby (only if not already set by gameStart message)
   if(!teamA.length || !teamB.length){
     teamA=[]; teamB=[];
-    lobbyPlayers.forEach((p,i)=>{(i%2===0?teamA:teamB).push(p.pseudo)});
+    if(gameMode==='duo' && lobbyPlayers.length>=2){
+      teamA=[lobbyPlayers[0].pseudo];
+      teamB=[lobbyPlayers[1].pseudo];
+    }else{
+      lobbyPlayers.forEach((p,i)=>{(i%2===0?teamA:teamB).push(p.pseudo)});
+    }
   }
 
   // Transition to interdits screen
@@ -1492,10 +1562,22 @@ function onGameStart(){
 }
 
 function showInterditsScreen(manche){
-  // Fill team names
-  document.getElementById('teamAMembers').textContent=teamA.join(' & ');
-  document.getElementById('teamBMembers').textContent=teamB.join(' & ');
-  document.getElementById('mancheText').textContent='MANCHE '+manche;
+  if(gameMode==='duo'){
+    document.getElementById('teamAMembers').textContent=teamA[0]||'';
+    document.getElementById('teamBMembers').textContent=teamB[0]||'';
+    document.getElementById('mancheText').textContent='DUEL';
+    // Changer les labels
+    document.querySelector('.score-team.team-a').textContent=teamA[0]||'JOUEUR 1';
+    document.querySelector('.score-team.team-b').textContent=teamB[0]||'JOUEUR 2';
+    document.querySelector('.score-members#teamAMembers').textContent='';
+    document.querySelector('.score-members#teamBMembers').textContent='';
+  }else{
+    document.getElementById('teamAMembers').textContent=teamA.join(' & ');
+    document.getElementById('teamBMembers').textContent=teamB.join(' & ');
+    document.getElementById('mancheText').textContent='MANCHE '+manche;
+    document.querySelector('.score-team.team-a').textContent='EQUIPE A';
+    document.querySelector('.score-team.team-b').textContent='EQUIPE B';
+  }
   document.getElementById('scoreA').textContent='0';
   document.getElementById('scoreB').textContent='0';
 
@@ -1508,7 +1590,6 @@ function showInterditsScreen(manche){
     const clone=item.cloneNode(true);
     item.parentNode.replaceChild(clone,item);
   });
-  // Re-trigger confirm button animation (même id pour le style / accessibilité)
   const btn=document.getElementById('btnConfirmInterdits');
   const btnClone=btn.cloneNode(true);
   btn.parentNode.replaceChild(btnClone,btn);
@@ -1858,13 +1939,22 @@ function seededShuffle(arr){
 function getSequences(seed){
   _gameSeed=seed;
   const cA=teamA[0], iA=teamA[1], cB=teamB[0], iB=teamB[1];
-  // Piocher 20 mots faciles (4 séquences x 5 mots) pour la qualification
   const allWords=pickWords('easy',20,seed);
   return [
     { giver:iA, guesser:cA, teamKey:'A', words:allWords.slice(0,5), found:Array(5).fill(false), currentWordIdx:0, lightsLit:0, points:0 },
     { giver:iB, guesser:cB, teamKey:'B', words:allWords.slice(5,10), found:Array(5).fill(false), currentWordIdx:0, lightsLit:0, points:0 },
     { giver:iB, guesser:cA, teamKey:'A', words:allWords.slice(10,15), found:Array(5).fill(false), currentWordIdx:0, lightsLit:0, points:0 },
     { giver:iA, guesser:cB, teamKey:'B', words:allWords.slice(15,20), found:Array(5).fill(false), currentWordIdx:0, lightsLit:0, points:0 },
+  ];
+}
+
+function getSequencesTwoPlayers(seed){
+  _gameSeed=seed;
+  const p0=teamA[0], p1=teamB[0];
+  const allWords=pickWords('easy',10,seed);
+  return [
+    { giver:p0, guesser:p1, teamKey:'B', words:allWords.slice(0,5), found:Array(5).fill(false), currentWordIdx:0, lightsLit:0, points:0 },
+    { giver:p1, guesser:p0, teamKey:'A', words:allWords.slice(5,10), found:Array(5).fill(false), currentWordIdx:0, lightsLit:0, points:0 },
   ];
 }
 
@@ -1886,8 +1976,8 @@ function startManche(){
   // Clients also generate with same seed for perfect sync
   if(isHost){
     const seed=Date.now();
-    mancheState.sequences=getSequences(seed);
-    sendData({type:'syncSequences',seed:seed,sequences:mancheState.sequences});
+    mancheState.sequences=gameMode==='duo'?getSequencesTwoPlayers(seed):getSequences(seed);
+    sendData({type:'syncSequences',seed:seed,sequences:mancheState.sequences,mode:gameMode});
     clientAwaitingSequenceStart=false;
     showScreen('screenManche');
     startSequence(0);
@@ -1914,11 +2004,22 @@ function startSequence(idx){
     if(s) s.classList.remove('lit');
   }
 
-  // Update HUD
-  document.getElementById('seqInfo').textContent='Séquence '+(idx+1)+'/4';
+  const totalSeq=gameMode==='duo'?2:4;
+  document.getElementById('seqInfo').textContent=(gameMode==='duo'?'Tour ':'Séquence ')+(idx+1)+'/'+totalSeq;
   document.getElementById('seqRoles').innerHTML=
-    renderPseudoOrVous(seq.giver,'role-giver')+' fait deviner à '+
+    renderPseudoOrVous(seq.giver,'role-giver')+' fait deviner \u00e0 '+
     renderPseudoOrVous(seq.guesser,'role-guesser');
+
+  // Adapter les labels HUD scores en mode duo
+  const hudTeamA=document.querySelector('.manche-hud .hud-team.team-a');
+  const hudTeamB=document.querySelector('.manche-hud .hud-team.team-b');
+  if(gameMode==='duo'){
+    if(hudTeamA) hudTeamA.textContent=teamA[0]||'Joueur 1';
+    if(hudTeamB) hudTeamB.textContent=teamB[0]||'Joueur 2';
+  }else{
+    if(hudTeamA) hudTeamA.textContent='EQUIPE A';
+    if(hudTeamB) hudTeamB.textContent='EQUIPE B';
+  }
 
   refreshPlayerPodium();
   clearDireFields();
@@ -1939,14 +2040,16 @@ function startSequence(idx){
   }
   if(mancheState.audio30s){try{mancheState.audio30s.pause()}catch(e){}}
 
-  // Disable buttons during intro
   // Show sequence overlay
   const seqOv=document.getElementById('seqOverlay');
-  document.getElementById('seqTitle').textContent='SÉQUENCE '+(idx+1);
-  document.getElementById('seqDetail').innerHTML=
-    'Équipe '+seq.teamKey+'<br>'+
-    renderPseudoOrVous(seq.giver,'name-highlight')+' <span class="role-tag giver">FAIT DEVINER</span><br>'+
-    renderPseudoOrVous(seq.guesser,'name-highlight')+' <span class="role-tag guesser">DEVINE</span>';
+  document.getElementById('seqTitle').textContent=(gameMode==='duo'?'TOUR ':'SÉQUENCE ')+(idx+1);
+  const seqDetailHTML=gameMode==='duo'
+    ? renderPseudoOrVous(seq.giver,'name-highlight')+' <span class="role-tag giver">FAIT DEVINER</span><br>'+
+      renderPseudoOrVous(seq.guesser,'name-highlight')+' <span class="role-tag guesser">DEVINE</span>'
+    : '\u00c9quipe '+seq.teamKey+'<br>'+
+      renderPseudoOrVous(seq.giver,'name-highlight')+' <span class="role-tag giver">FAIT DEVINER</span><br>'+
+      renderPseudoOrVous(seq.guesser,'name-highlight')+' <span class="role-tag guesser">DEVINE</span>';
+  document.getElementById('seqDetail').innerHTML=seqDetailHTML;
   seqOv.classList.add('visible');
 
   setTimeout(()=>{
@@ -2166,7 +2269,7 @@ function refreshDireInputState(){
     if(myTurn) g.focus();
 
     const pass=document.getElementById('btnPass');
-    if(pass) pass.disabled=!chronoOn||!myTurn;
+    if(pass) pass.disabled=!myTurn;
   }
 
   // ── Guesser ──
@@ -2346,25 +2449,25 @@ function onCorrectAnswer(fromNetwork){
   if(!fromNetwork) sendData({type:'syncCorrect',seqIdx:mancheState.currentSeq,wordIdx:wi});
 }
 
-function onPassWord(fromNetwork){
-  if(!mancheState.started && !fromNetwork) return;
-  if(!fromNetwork && !isLocalGiver()) return;
+function onPassWord(){
+  if(!isLocalGiver()) return;
+  if(!mancheState.wordsPhase) return;
   const seq=mancheState.sequences[mancheState.currentSeq];
 
   const startIdx=(seq.currentWordIdx+1)%5;
   for(let i=0;i<5;i++){
     const idx=(startIdx+i)%5;
     if(!seq.found[idx]){
+      playGameSound('son/passer.wav',0.75);
+      const needChrono=!mancheState.started;
+      if(needChrono) tryStartTimerAfterFirstClue();
       seq.currentWordIdx=idx;
       clearDireFields();
-      // Le tour revient/reste au giver après un pass
       mancheState.turn='giver';
       refreshDireInputState();
       updateWordDisplay(seq,{animate:true});
-      if(!fromNetwork){
-        sendData({type:'syncPass',seqIdx:mancheState.currentSeq,newWordIdx:idx});
-        sendData({type:'turnChange',turn:'giver'});
-      }
+      sendData({type:'syncPass',seqIdx:mancheState.currentSeq,newWordIdx:idx,startChrono:needChrono});
+      sendData({type:'turnChange',turn:'giver'});
       return;
     }
   }
@@ -2382,8 +2485,8 @@ function endSequence(){
   document.getElementById('wordFrame').classList.remove('visible');
 
   const nextSeq=mancheState.currentSeq+1;
-  if(nextSeq>=4){
-    // Manche finished
+  const maxSeq=gameMode==='duo'?2:4;
+  if(nextSeq>=maxSeq){
     setTimeout(()=>{ showMancheResults(); },1500);
   }else{
     // Next sequence
@@ -2392,9 +2495,10 @@ function endSequence(){
 }
 
 function showMancheResults(){
-  // Compute candidate scores
-  // Candidat A scored in seq 0 (as guesser) + seq 2 (as guesser)
-  // Candidat B scored in seq 1 (as guesser) + seq 3 (as guesser)
+  if(gameMode==='duo'){
+    showMancheResultsDuo();
+    return;
+  }
   const s=mancheState.sequences;
   const candidatAScore=s[0].points+s[2].points;
   const candidatBScore=s[1].points+s[3].points;
@@ -2406,8 +2510,40 @@ function showMancheResults(){
     (candidatAScore===candidatBScore?'Égalité !':winner+' est qualifié(e) !');
 
   alert(msg);
-  // Return to menu for now
   backToMenu();
+}
+
+function showMancheResultsDuo(){
+  const s=mancheState.sequences;
+  const p0=teamA[0], p1=teamB[0];
+  // Séq 0: p0 fait deviner → p1 devine → points = score de p1 quand il devinait
+  // Séq 1: p1 fait deviner → p0 devine → points = score de p0 quand il devinait
+  const scoreP1asGuesser=s[0].points; // p1 devinait au tour 1
+  const scoreP0asGuesser=s[1].points; // p0 devinait au tour 2
+
+  const body=document.getElementById('resultsDuoBody');
+  // Mettre en valeur le joueur local
+  const isP0=pseudoMatch(myPseudo,p0);
+  const isP1=pseudoMatch(myPseudo,p1);
+
+  body.innerHTML=
+    '<tr'+(isP0?' style="background:rgba(255,215,0,0.08)"':'')+'><td>'+escapeHtml(p0)+(isP0?' <small style="color:#ffe040">(vous)</small>':'')+'</td>'+
+    '<td style="color:#888">fait deviner</td>'+
+    '<td style="font-size:1.3rem;font-weight:900">'+scoreP0asGuesser+'</td>'+
+    '<td style="font-size:1.4rem;font-weight:900;color:#fff"><strong>'+scoreP0asGuesser+'</strong></td></tr>'+
+    '<tr'+(isP1?' style="background:rgba(255,215,0,0.08)"':'')+'><td>'+escapeHtml(p1)+(isP1?' <small style="color:#ffe040">(vous)</small>':'')+'</td>'+
+    '<td style="font-size:1.3rem;font-weight:900">'+scoreP1asGuesser+'</td>'+
+    '<td style="color:#888">fait deviner</td>'+
+    '<td style="font-size:1.4rem;font-weight:900;color:#fff"><strong>'+scoreP1asGuesser+'</strong></td></tr>';
+
+  const winEl=document.getElementById('resultsDuoWinner');
+  if(scoreP0asGuesser>scoreP1asGuesser) winEl.textContent='\u{1F3C6} '+p0+' remporte la partie !';
+  else if(scoreP1asGuesser>scoreP0asGuesser) winEl.textContent='\u{1F3C6} '+p1+' remporte la partie !';
+  else winEl.textContent='\u{1F91D} \u00c9galit\u00e9 parfaite !';
+
+  // Remettre la musique d'accueil
+  resumeAccueilMusic();
+  showScreen('screenResultsDuo');
 }
 
 // ── Back to menu ──
@@ -2415,8 +2551,11 @@ function backToMenu(){
   for(const p of conns){if(p.conn)try{p.conn.close()}catch(e){}}
   if(peer)try{peer.destroy()}catch(e){}
   conns=[];peer=null;connected=false;isHost=false;lobbyPlayers=[];
+  gameMode='qualif';
   showScreen('screenAccueil');
   document.getElementById('btnPlay').disabled=false;
+  const b=document.getElementById('btnPlayDuo');
+  if(b) b.disabled=false;
   resumeAccueilMusic();
 }
 
@@ -2424,9 +2563,10 @@ function backToMenu(){
 setInterval(()=>{
   if(document.getElementById('screenLobby').classList.contains('active')){
     const count=lobbyPlayers.length;
-    if(count<MAX_PLAYERS&&count>0){
+    const cap=maxPlayersForMode();
+    if(count<cap&&count>0){
       const dots='.'.repeat((Date.now()/500|0)%4);
-      document.getElementById('lobbyStatus').textContent=count+'/'+MAX_PLAYERS+' joueurs \u2014 En attente'+dots;
+      document.getElementById('lobbyStatus').textContent=count+'/'+cap+' joueurs \u2014 En attente'+dots;
     }
   }
 },500);
@@ -2434,13 +2574,15 @@ setInterval(()=>{
 // ══════════════════════════════════════════
 // EVENT LISTENERS
 // ══════════════════════════════════════════
-document.getElementById('btnPlay').addEventListener('click',startSearch);
+document.getElementById('btnPlay').addEventListener('click',()=>{gameMode='qualif';startSearch();});
+document.getElementById('btnPlayDuo').addEventListener('click',()=>{gameMode='duo';startSearch();});
+document.getElementById('btnResultsDuoMenu').addEventListener('click',backToMenu);
 document.getElementById('btnBackMenu').addEventListener('click',backToMenu);
 document.getElementById('interditsConfirmWrap').addEventListener('click',e=>{
   if(!e.target.closest('#btnConfirmInterdits')) return;
   onConfirmInterdits();
 });
-document.getElementById('btnPass').addEventListener('click',()=>onPassWord());
+document.getElementById('btnPass').addEventListener('click',onPassWord);
 
 document.getElementById('direGiver').addEventListener('input',e=>{
   if(!isLocalGiver()) return;
