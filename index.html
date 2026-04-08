@@ -926,6 +926,7 @@
     <div class="logo-container">
       <div class="logo-frame">
         <div class="logo-title">MOT DE PASSE</div>
+        <div class="logo-subtitle">&#9733; Flash &#9733;</div>
       </div>
     </div>
     <div class="prize-banner">
@@ -1392,6 +1393,7 @@ function onData(data,fromConn){
       const seq=mancheState.sequences[data.seqIdx];
       if(seq){
         seq.currentWordIdx=data.newWordIdx;
+        playGameSound('son/passer.wav',0.75);
         console.log('[MDP] syncPass applied: new word="'+seq.words[seq.currentWordIdx]+'" idx='+seq.currentWordIdx);
         if(data.startChrono && mancheState.wordsPhase && !mancheState.started){
           startTimer();
